@@ -1,6 +1,6 @@
 ---
 title: "STAT/MATH 495: Problem Set 10"
-author: "WRITE YOUR NAME(S) HERE"
+author: "MERON GEDRAGO"
 date: "2017-11-28"
 output:
   html_document:
@@ -30,6 +30,9 @@ Please indicate who you collaborated with on this assignment:
 library(tidyverse)
 library(broom)
 library(glmnet)
+library(MASS)
+library(gdata)
+library(modelr)
 
 train <- read_csv("data/train.csv")
 test <- read_csv("data/test.csv")
@@ -55,10 +58,76 @@ predictor_matrix_test <- model.matrix(model_formula, data = test)[, -1]
 
 
 # Do work and create submission files:
+1. LM MODEL 
+
 
 ```{r}
+#fit lm model 
+model_lm <- lm(model_formula, data=train)
 
+ 
+ 
+#predict for the test data 
+lm_predict <- predict(model_lm , newdata=test )
+lm_predict <- lm_predict %>% as_data_frame()
+lm_predict <- exp(lm_predict)
+prediction1 <- cbind(test$id,lm_predict)
+names(prediction1)[1] <- "id"
+names(prediction1)[2] <- "price_doc"
+
+#write the document 
+write_csv(prediction1,"sumbmission1.csv")
+
+#plot the prediction of test 
+hist(x= prediction1$price_doc)
+ 
+#finding the rmlse 
+rmse(model_lm, train)
 ```
+
+
+
+LASSO MODEL 
+
+
+```{r}
+#Define values of tuning/complexity parameter lambda
+# Note: we set them to increase at an exponential rate in powers of 10
+lambda_inputs <- 10^seq(-2, 10, length = 100)
+
+LASSO_fit <- glmnet(x=predictor_matrix_train, y=train$log_price_doc, alpha = 1, lambda = lambda_inputs)
+# 
+LASSO_CV <- cv.glmnet(x=predictor_matrix_train, y=train$log_price_doc, alpha = 1, lambda = lambda_inputs)
+
+# Optimal lambdas
+lambda_star <- LASSO_CV$lambda.min
+lambda_star_1SE <- LASSO_CV$lambda.1se
+
+#predict the 
+lasso_predict <- predict(LASSO_fit, newx=predictor_matrix_test, s=lambda_star_1SE) %>% 
+  as.vector()
+lasso_predict <- lasso_predict %>% as_data_frame()
+lasso_predict <- exp(lasso_predict)  
+prediction2 <- cbind(test$id,lasso_predict)
+names(prediction2)[1] <- "id"
+names(prediction2)[2] <- "price_doc"
+
+ 
+write_csv(prediction2,  "sumbmission2.csv")
+
+#plot the prediction of test 
+hist(x= prediction2$price_doc)
+
+#find the rmlse 
+x <- LASSO_CV$cvm
+mse <- mean(x^2)
+rmse = sqrt(mse)
+
+ 
+```
+
+
+
 
 
 
@@ -72,5 +141,5 @@ in these cells:
 
 Method                | Training Score  | Kaggle Score
 --------------------- | -------------   | -------------
-lm                    |                 |  
-LASSO crossvalidated  |                 |  
+lm                    | 0.2534705       |  2.63413
+LASSO crossvalidated  | 0.3799357       |  0.42577
